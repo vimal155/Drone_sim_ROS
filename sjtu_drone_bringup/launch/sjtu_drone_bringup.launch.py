@@ -21,11 +21,13 @@ from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, OpaqueFunction
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch_ros.actions import Node
+from launch.substitutions import LaunchConfiguration
+
 
 def get_teleop_controller(context, *_, **kwargs) -> Node:
     controller = context.launch_configurations["controller"]
     namespace = kwargs["model_ns"]
-    
+
     if controller == "joystick":
         node = Node(
             package="sjtu_drone_control",
@@ -45,13 +47,33 @@ def get_teleop_controller(context, *_, **kwargs) -> Node:
 
     return [node]
 
+def rviz_node_generator(context, rviz_path):
+    """Return a Node action for RViz, omitting --fixed-frame if empty."""
+    fixed_frame_value = LaunchConfiguration('fixed_frame').perform(context)
+
+    rviz_arguments = ['-d', rviz_path]
+
+    if fixed_frame_value:
+        rviz_arguments.extend(['--fixed-frame', fixed_frame_value])
+
+    return [
+        Node(
+            package='rviz2',
+            executable='rviz2',
+            name='rviz2',
+            arguments=rviz_arguments,
+            output='screen',
+        )
+    ]
+
+
 def generate_launch_description():
     sjtu_drone_bringup_path = get_package_share_directory('sjtu_drone_bringup')
 
     rviz_path = os.path.join(
         sjtu_drone_bringup_path, "rviz", "rviz.rviz"
     )
-    
+
     yaml_file_path = os.path.join(
         get_package_share_directory('sjtu_drone_bringup'),
         'config', 'drone.yaml'
@@ -70,15 +92,17 @@ def generate_launch_description():
             description="Type of controller: keyboard (default) or joystick",
         ),
 
-        Node(
-            package="rviz2",
-            executable="rviz2",
-            name="rviz2",
-            arguments=[
-                "-d", rviz_path
-            ],
-            output="screen",
+        DeclareLaunchArgument(
+            'fixed_frame',
+            default_value='',
+            description='If provided, sets the fixed frame in RViz.'
         ),
+
+        OpaqueFunction(
+            function=rviz_node_generator,
+            kwargs={'rviz_path': rviz_path},
+        ),
+
 
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(
