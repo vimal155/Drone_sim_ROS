@@ -51,9 +51,17 @@ def generate_launch_description():
     print("namespace: ", model_ns)
 
 
-    world_file = os.path.join(
+    world_file_default = os.path.join(
         get_package_share_directory("sjtu_drone_description"),
         "worlds", "playground.world"
+    )
+
+    world_file = LaunchConfiguration('world', default=world_file_default)
+
+    world = DeclareLaunchArgument(
+        name='world',
+        default_value=world_file_default,
+        description='Full path to world file to load'
     )
 
     def launch_gzclient(context, *args, **kwargs):
@@ -67,6 +75,7 @@ def generate_launch_description():
         return []
 
     return LaunchDescription([
+        world,
         use_gui,
         Node(
             package="robot_state_publisher",
